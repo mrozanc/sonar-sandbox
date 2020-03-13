@@ -1,0 +1,19 @@
+pluginManagement {
+    plugins {
+        id 'org.sonarqube' version "${sonarQubePluginVersion}"
+    }
+}
+
+rootProject.name = 'sonar-sandbox'
+
+// Add all modules in modules/
+file('modules')
+        .listFiles((FileFilter) { File d ->
+            d.isDirectory() &&
+                    d.listFiles().any { it.isFile() && ['build.gradle', 'build.gradle.kts'].contains(it.name) }
+        })
+        .each { projectDir ->
+            include("${projectDir.name}")
+            project(":${projectDir.name}").projectDir = projectDir
+        }
+

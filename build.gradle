@@ -1,0 +1,60 @@
+plugins {
+    id 'org.sonarqube'
+    id 'jacoco'
+}
+
+allprojects {
+    repositories {
+        mavenCentral()
+    }
+
+    pluginManager.withPlugin('java') {
+        tasks.named('test', Test) { test ->
+            test.useJUnitPlatform()
+        }
+    }
+
+    pluginManager.withPlugin('jacoco') {
+        sonarqube {
+            properties {
+                property 'sonar.jacoco.reportPaths',
+                        rootProject.tasks.named('jacocoMerge', JacocoMerge)
+                                .map { it.destinationFile.path }.get()
+                property 'sonar.coverage.jacoco.xmlReportPaths',
+                        rootProject.tasks.named('jacocoMergedReport', JacocoReport)
+                                .map { it.reports.xml.destination.path }.get()
+            }
+        }
+    }
+}
+
+tasks.register('jacocoMerge', JacocoMerge) { jacocoMerge ->
+    jacocoMerge.group = 'verification'
+    jacocoMerge.description = 'Merge Jacoco Data of all modules'
+    jacocoMerge.destinationFile = file("$buildDir/jacoco/mergedTest.exec")
+    def jacocoProjects = subprojects.findAll { it.pluginManager.hasPlugin('jacoco') }
+    jacocoMerge.dependsOn jacocoProjects.collect { it.tasks.withType(Test) }
+    jacocoMerge.executionData(jacocoProjects.collectMany { Project p ->
+        p.tasks.withType(Test)
+                .collect { it.jacoco.destinationFile }
+                .findAll { it.exists() }
+    })
+}
+
+tasks.register('jacocoMergedReport', JacocoReport) { jacocoMergedReport ->
+    jacocoMergedReport.group = 'verification'
+    jacocoMergedReport.description = 'Generates a merged coverage report of all modules'
+    def jacocoMerge = tasks.named('jacocoMerge', JacocoMerge)
+    jacocoMergedReport.dependsOn(jacocoMerge)
+    jacocoMergedReport.executionData(jacocoMerge)
+    jacocoMergedReport.sourceSets(subprojects
+            .findAll { it.pluginManager.hasPlugin('java') }
+            .collect { it.sourceSets.main }
+            .toArray(new SourceSet[0]) as SourceSet[])
+    jacocoMergedReport.reports {
+        xml.enabled true
+        html.enabled true
+    }
+}
+
+tasks.named('sonarqube') { it.dependsOn(tasks.named('jacocoMergedReport')) }

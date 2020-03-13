@@ -1,0 +1,10 @@
+plugins {
+    id 'java'
+    id 'jacoco'
+}
+
+dependencies {
+    implementation project(':first-module')
+
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter', version: '5.6.0'
+}
